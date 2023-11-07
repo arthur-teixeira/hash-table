@@ -18,6 +18,7 @@ typedef struct hash_table_t {
     node_t **bucket;
 } hash_table_t;
 
+// TODO: Implement CLRS multiplication method
 int default_hasher(size_t table_size, const char *key) {
     int acc = 1;
     for (size_t i = 0; i < strlen(key); i++) {
