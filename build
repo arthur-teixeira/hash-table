@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -xe
+
+CFLAGS="-Wall -Wextra"
+
+mkdir -p ./bin/
+
+clang $CFLAGS -o ./bin/main main.c
+
