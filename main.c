@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-typedef int (* hasher)(size_t, const char *);
+typedef size_t (* hasher)(void *, const char *);
 
 typedef struct node_t {
     struct node_t *next;
@@ -15,28 +16,40 @@ typedef struct node_t {
 typedef struct hash_table_t {
     hasher hasher;
     size_t size;
+    size_t p;
     node_t **bucket;
 } hash_table_t;
 
-// TODO: Implement CLRS multiplication method
-int default_hasher(size_t table_size, const char *key) {
+int string_as_int(const char *key) {
     int acc = 1;
     for (size_t i = 0; i < strlen(key); i++) {
-        acc *=key[i];
+        acc *=key[i] + i;
     }
 
-    return acc % table_size;
+    return acc; 
+}
+
+// "Introduction to Algorithms, third edition", Cormen et al., 13.3.2 p:263
+// "The Art of Computer Programming, Volume 3, Sorting and Searching", D.E. Knuth, 6.4 p:516
+size_t knuth_hash(void *t, const char *key) {
+    hash_table_t *table = t;
+    size_t knuth = 2654435769L;
+    size_t key_as_int = string_as_int(key);
+    size_t hash = (key_as_int * knuth) >> (32 - table->p);
+    
+    return hash % table->size;
 }
 
 void hash_table_init(hash_table_t *table, size_t initial_size) {
-    table->hasher = default_hasher;
+    table->hasher = knuth_hash;
+    table->p = rand() % 32;
     table->size = initial_size;
     table->bucket = calloc(initial_size, sizeof(node_t *));
     memset(table->bucket, 0, initial_size * sizeof(node_t *));
 }
 
 void hash_table_insert(hash_table_t *table, char *key, int value) {
-    int hash = table->hasher(table->size, key);
+    int hash = table->hasher(table, key);
     node_t *head = table->bucket[hash];
     node_t *new_node = malloc(sizeof(node_t));
     *new_node = (node_t) {
@@ -54,7 +67,7 @@ void hash_table_insert(hash_table_t *table, char *key, int value) {
 }
 
 int *hash_table_lookup(hash_table_t *table, const char *key) {
-    int hash = table->hasher(table->size, key);
+    int hash = table->hasher(table, key);
     node_t *head = table->bucket[hash];
     node_t *current = head;
     while (current) {
@@ -68,6 +81,7 @@ int *hash_table_lookup(hash_table_t *table, const char *key) {
 }
 
 int main() {
+    srand(time(NULL));
     printf("Hello world!\n");
 
     hash_table_t table;
