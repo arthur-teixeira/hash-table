@@ -21,15 +21,6 @@ typedef struct hash_table_t {
   node_t **bucket;
 } hash_table_t;
 
-int string_as_int(const char *key) {
-  int acc = 1;
-  for (size_t i = 0; i < strlen(key); i++) {
-    acc *= key[i] + i;
-  }
-
-  return acc;
-}
-
 void hash_table_delete(hash_table_t *table, const char *key);
 void *hash_table_lookup(hash_table_t *table, const char *key);
 void hash_table_insert(hash_table_t *table, char *key, void *value);
@@ -46,6 +37,15 @@ void hash_table_init(hash_table_t *table, size_t initial_size);
 #ifndef HASH_TABLE_FREE
 #define HASH_TABLE_FREE(ptr) free(ptr)
 #endif
+
+int string_as_int(const char *key) {
+  int acc = 1;
+  for (size_t i = 0; i < strlen(key); i++) {
+    acc *= key[i] + i;
+  }
+
+  return acc;
+}
 
 // "Introduction to Algorithms, third edition", Cormen et al., 13.3.2 p:263
 // "The Art of Computer Programming, Volume 3, Sorting and Searching", D.E.
