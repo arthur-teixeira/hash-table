@@ -1,3 +1,6 @@
+#ifndef HASH_TABLE_H
+#define HASH_TABLE_H
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +34,8 @@ void hash_table_delete(hash_table_t *table, const char *key);
 void *hash_table_lookup(hash_table_t *table, const char *key);
 void hash_table_insert(hash_table_t *table, char *key, void *value);
 void hash_table_init(hash_table_t *table, size_t initial_size);
+
+#endif // HASH_TABLE_H
 
 #ifdef HASH_TABLE_IMPLEMENTATION
 
