@@ -1,6 +1,6 @@
 # Hash table
 
-A simple stb style hash table for c/c++. It uses open addressing and linear probing to manage collisions.
+A simple [stb style](https://github.com/nothings/stb) hash table for c/c++. It uses open addressing and linear probing to manage collisions.
 
 ## How to use
 - Copy stb_hashtable.h to your project
