@@ -21,3 +21,10 @@ To run the tests, you have to install the [Unity testing framework](https://gith
 ```sh
 $ ./run-tests.sh
 ```
+
+## TO DO
+- [ ] Rehash table depending on the load factor
+- [ ] Add option to change the hashing function
+- [ ] Add option to change the probing strategy (linear, quadratic and double hash)
+- [ ] Universal hashing function
+- [ ] Add possibility for the key to be any type, not just strings
