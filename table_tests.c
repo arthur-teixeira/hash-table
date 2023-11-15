@@ -1,16 +1,33 @@
+#include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unity/unity.h>
 #define HASH_TABLE_IMPLEMENTATION
 #include "stb_hashtable.h"
 
 #define LEN(xs) sizeof(xs) / sizeof(xs[0])
+hash_table_t sut;
 
-void setUp(void) {
-    // set stuff up here
+void setUp(void) { hash_table_init(&sut); }
+
+void tearDown(void) { memset(&sut, 0, sizeof(hash_table_t)); }
+
+void populate(char **keys, size_t n) {
+  for (size_t i = 0; i < n; i++) {
+    int *val = malloc(sizeof(int));
+    *val = i;
+    hash_table_insert(&sut, keys[i], val);
+  }
 }
 
-void tearDown(void) {
-    // clean stuff up here
+void assert_values(char **keys, size_t n, bool can_free) {
+  for (size_t i = 0; i < n; i++) {
+    int *val = hash_table_lookup(&sut, keys[i]);
+    TEST_ASSERT_EQUAL(*val, i);
+    if (can_free) {
+      free(val);
+    }
+  }
 }
 
 void test_insertions() {
@@ -20,24 +37,48 @@ void test_insertions() {
       "olleh",
   };
 
-  hash_table_t sut;
-  hash_table_init(&sut);
+  populate(keys, LEN(keys));
+  assert_values(keys, LEN(keys), true);
+}
+
+// NOTE: This test is highly coupled to the hashing function
+void test_collisions() {
+  tearDown();
+  hash_table_init_ex(&sut, 2);
+
+  char *keys[] = {
+      "hello",
+      "helo",
+  };
+
+  populate(keys, LEN(keys));
+  assert_values(keys, LEN(keys), true);
+}
+
+void test_deletions() {
+  char *keys[] = {
+      "hello",
+      "hey",
+      "olleh",
+  };
+
+  populate(keys, LEN(keys));
+  assert_values(keys, LEN(keys), false);
 
   for (size_t i = 0; i < LEN(keys); i++) {
-    int *val = malloc(sizeof(int));
-    *val = i;
-    hash_table_insert(&sut, keys[i], val);
+    hash_table_delete(&sut, keys[i]);
   }
 
   for (size_t i = 0; i < LEN(keys); i++) {
     int *val = hash_table_lookup(&sut, keys[i]);
-    TEST_ASSERT_EQUAL(*val, i);
-    free(val);
+    TEST_ASSERT_NULL(val);
   }
 }
 
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_insertions);
+  RUN_TEST(test_collisions);
+  RUN_TEST(test_deletions);
   return UNITY_END();
 }
