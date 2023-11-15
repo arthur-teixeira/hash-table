@@ -130,6 +130,8 @@ void hash_table_delete(hash_table_t *table, const char *key) {
 
   node->in_use = false;
   HASH_TABLE_FREE(node->value);
+  node->value = NULL;
+  node->key = 0;
 }
 
 #endif // HASH_TABLE_IMPLEMENTATION
