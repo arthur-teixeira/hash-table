@@ -1,33 +1,36 @@
 #ifndef HASH_TABLE_H
 #define HASH_TABLE_H
 
+#include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef size_t (*hasher)(void *, const char *);
 
-typedef struct node_t {
-  struct node_t *next;
-  struct node_t *prev;
+typedef struct hash_position_t {
+  bool in_use;
   const char *key;
   void *value;
-} node_t;
+} hash_position_t;
 
 typedef struct hash_table_t {
   hasher hasher;
   size_t size;
   size_t p;
-  node_t **bucket;
+  hash_position_t *values;
 } hash_table_t;
 
 void hash_table_delete(hash_table_t *table, const char *key);
 void *hash_table_lookup(hash_table_t *table, const char *key);
 void hash_table_insert(hash_table_t *table, char *key, void *value);
-void hash_table_init(hash_table_t *table, size_t initial_size);
+void hash_table_init(hash_table_t *table);
+void hash_table_init_ex(hash_table_t *table, size_t initial_size);
 
 #endif // HASH_TABLE_H
 
+#define HASH_TABLE_IMPLEMENTATION // REMOVE
 #ifdef HASH_TABLE_IMPLEMENTATION
 
 #ifndef HASH_TABLE_MALLOC
@@ -59,48 +62,59 @@ size_t knuth_hash(void *t, const char *key) {
   return hash % table->size;
 }
 
-void hash_table_init(hash_table_t *table, size_t initial_size) {
+void hash_table_init_ex(hash_table_t *table, size_t initial_size) {
   table->hasher = knuth_hash;
   table->p = rand() % 32;
   table->size = initial_size;
-  table->bucket = HASH_TABLE_MALLOC(initial_size * sizeof(node_t *));
-  memset(table->bucket, 0, initial_size * sizeof(node_t *));
+  table->values = HASH_TABLE_MALLOC(initial_size * sizeof(hash_position_t));
+  memset(table->values, 0, initial_size * sizeof(hash_position_t));
+}
+
+void hash_table_init(hash_table_t *table) {
+  return hash_table_init_ex(table, 1 << 10);
 }
 
 void hash_table_insert(hash_table_t *table, char *key, void *value) {
   int hash = table->hasher(table, key);
-  node_t *head = table->bucket[hash];
-  node_t *new_node = HASH_TABLE_MALLOC(sizeof(node_t));
-  *new_node = (node_t){
-      .key = key,
-      .value = value,
-      .next = head,
-      .prev = NULL,
-  };
+  bool found = false;
 
-  if (head) {
-    head->next = new_node;
-  } else {
-    table->bucket[hash] = new_node;
+  // Linear probing the whole table
+  for (size_t i = 0; i < table->size; i++) {
+    hash_position_t *position = &table->values[(hash + i) % table->size];
+    if (!position->in_use) {
+      position->in_use = true;
+      position->key = key;
+      position->value = value;
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    assert(0 && "TODO: rehash table");
   }
 }
 
-node_t *hash_table_lookup_internal(hash_table_t *table, const char *key) {
+hash_position_t *hash_table_lookup_internal(hash_table_t *table,
+                                            const char *key) {
   int hash = table->hasher(table, key);
-  node_t *head = table->bucket[hash];
-  node_t *current = head;
-  while (current) {
+
+  for (size_t i = 0; i < table->size; i++) {
+    hash_position_t *current = &table->values[(hash + i) % table->size];
+    if (!current->in_use) {
+      continue;
+    }
+
     if (strcmp(current->key, key) == 0) {
       return current;
     }
-    current = current->next;
   }
 
   return NULL;
 }
 
 void *hash_table_lookup(hash_table_t *table, const char *key) {
-  node_t *val = hash_table_lookup_internal(table, key);
+  hash_position_t *val = hash_table_lookup_internal(table, key);
   if (val) {
     return val->value;
   }
@@ -109,21 +123,13 @@ void *hash_table_lookup(hash_table_t *table, const char *key) {
 }
 
 void hash_table_delete(hash_table_t *table, const char *key) {
-  node_t *node = hash_table_lookup_internal(table, key);
+  hash_position_t *node = hash_table_lookup_internal(table, key);
   if (!node) {
     return;
   }
 
-  if (node->prev) {
-    node->prev->next = node->next;
-  }
-
-  if (node->next) {
-    node->next->prev = node->prev;
-  }
-
+  node->in_use = false;
   HASH_TABLE_FREE(node->value);
-  HASH_TABLE_FREE(node);
 }
 
 #endif // HASH_TABLE_IMPLEMENTATION
