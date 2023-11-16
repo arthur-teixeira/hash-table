@@ -30,7 +30,6 @@ void hash_table_init_ex(hash_table_t *table, size_t initial_size);
 
 #endif // HASH_TABLE_H
 
-#define HASH_TABLE_IMPLEMENTATION // REMOVE
 #ifdef HASH_TABLE_IMPLEMENTATION
 
 #ifndef HASH_TABLE_MALLOC
