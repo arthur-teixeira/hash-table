@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef size_t (*hasher)(void *, const char *);
+typedef size_t (*hasher_t)(void *, const char *);
 
 typedef struct hash_position_t {
   bool in_use;
@@ -15,8 +15,23 @@ typedef struct hash_position_t {
   void *value;
 } hash_position_t;
 
+typedef enum {
+  PROBE_LINEAR,
+  PROBE_QUADRATIC, // TODO: implement
+  PROBE_DOUBLE_HASH,
+} probe_strategy;
+
+typedef struct hash_options_t {
+  hasher_t hasher;
+  hasher_t double_hasher;
+  probe_strategy strategy;
+  size_t size;
+} hash_options_t;
+
 typedef struct hash_table_t {
-  hasher hasher;
+  probe_strategy strategy;
+  hasher_t hasher;
+  hasher_t double_hasher;
   size_t size;
   size_t p;
   hash_position_t *values;
@@ -26,10 +41,11 @@ void hash_table_delete(hash_table_t *table, const char *key);
 void *hash_table_lookup(hash_table_t *table, const char *key);
 void hash_table_insert(hash_table_t *table, char *key, void *value);
 void hash_table_init(hash_table_t *table);
-void hash_table_init_ex(hash_table_t *table, size_t initial_size);
+void hash_table_init_ex(hash_table_t *table, hash_options_t options);
 
 #endif // HASH_TABLE_H
 
+// #define HASH_TABLE_IMPLEMENTATION // REMOVE
 #ifdef HASH_TABLE_IMPLEMENTATION
 
 #ifndef HASH_TABLE_MALLOC
@@ -61,25 +77,87 @@ size_t knuth_hash(void *t, const char *key) {
   return hash % table->size;
 }
 
-void hash_table_init_ex(hash_table_t *table, size_t initial_size) {
-  table->hasher = knuth_hash;
+// https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+size_t fnv_hash(void *t, const char *key) {
+  hash_table_t *table = t;
+  size_t fnv_prime = 1099511628211U;
+  size_t fnv_offset = 14695981039346656037U;
+
+  size_t hash = fnv_offset;
+
+  for (size_t i = 0; i < strlen(key); i++, key++) {
+    hash *= fnv_prime;
+    hash ^= (*key);
+  }
+
+  return hash % table->size;
+}
+
+void hash_table_init_ex(hash_table_t *table, hash_options_t options) {
+  if (options.hasher) {
+    table->hasher = options.hasher;
+  } else {
+    table->hasher = knuth_hash;
+  }
+
+  if (options.strategy == PROBE_DOUBLE_HASH) {
+    if (options.double_hasher) {
+      table->double_hasher = options.double_hasher;
+    } else {
+      table->double_hasher = fnv_hash;
+    }
+  }
+  table->strategy = options.strategy;
   table->p = rand() % 32;
-  table->size = initial_size;
-  table->values = HASH_TABLE_MALLOC(initial_size * sizeof(hash_position_t));
-  memset(table->values, 0, initial_size * sizeof(hash_position_t));
+  table->size = options.size;
+  table->values = HASH_TABLE_MALLOC(options.size * sizeof(hash_position_t));
+  memset(table->values, 0, options.size * sizeof(hash_position_t));
 }
 
 void hash_table_init(hash_table_t *table) {
-  return hash_table_init_ex(table, 1 << 10);
+  hash_options_t default_options = {
+      .size = 1 << 10,
+      .hasher = knuth_hash,
+      .strategy = PROBE_LINEAR,
+  };
+  return hash_table_init_ex(table, default_options);
+}
+
+size_t linear_probe(hash_table_t *table, int hash, size_t i) {
+  return (hash + i) % table->size;
+}
+
+// "Introduction to Algorithms, third edition", Cormen et al., 13.3.2 p:272
+// Assuming that the table size is always a power of two, we modify the second
+// hash to always return an odd number, such that the second hash and the table
+// size are coprime to each other. That guarantees that the whole table will be
+// searched.
+size_t double_hash(hash_table_t *table, int hash, const char *key, size_t i) {
+  assert(table->double_hasher &&
+         "To use double hash, you must provide a second hash function");
+  int second_hash =
+      table->double_hasher(table, key) | 1; // Always use an odd second hash
+  return (hash + (i * second_hash)) % table->size;
+}
+
+size_t probe(hash_table_t *table, int hash, const char *key, size_t i) {
+  switch (table->strategy) {
+  case PROBE_LINEAR:
+    return linear_probe(table, hash, i);
+  case PROBE_DOUBLE_HASH:
+    return double_hash(table, hash, key, i);
+  default:
+    assert(0 && "not implemented");
+  }
 }
 
 void hash_table_insert(hash_table_t *table, char *key, void *value) {
   int hash = table->hasher(table, key);
   bool found = false;
 
-  // Linear probing the whole table
   for (size_t i = 0; i < table->size; i++) {
-    hash_position_t *position = &table->values[(hash + i) % table->size];
+    size_t idx = probe(table, hash, key, i);
+    hash_position_t *position = &table->values[idx];
     if (!position->in_use) {
       position->in_use = true;
       position->key = key;
@@ -99,7 +177,8 @@ hash_position_t *hash_table_lookup_internal(hash_table_t *table,
   int hash = table->hasher(table, key);
 
   for (size_t i = 0; i < table->size; i++) {
-    hash_position_t *current = &table->values[(hash + i) % table->size];
+    size_t idx = probe(table, hash, key, i);
+    hash_position_t *current = &table->values[idx];
     if (!current->in_use) {
       continue;
     }

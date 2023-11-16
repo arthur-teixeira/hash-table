@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unity/unity.h>
+#include <unity/unity_internals.h>
 #define HASH_TABLE_IMPLEMENTATION
 #include "stb_hashtable.h"
 
@@ -44,7 +45,12 @@ void test_insertions() {
 // NOTE: This test is highly coupled to the hashing function
 void test_collisions() {
   tearDown();
-  hash_table_init_ex(&sut, 2);
+  hash_options_t opts = {
+      .strategy = PROBE_LINEAR,
+      .size = 2,
+      .hasher = NULL,
+  };
+  hash_table_init_ex(&sut, opts);
 
   char *keys[] = {
       "hello",
@@ -54,6 +60,26 @@ void test_collisions() {
   populate(keys, LEN(keys));
   assert_values(keys, LEN(keys), true);
 }
+
+void test_double_hash_collisions() {
+  tearDown();
+  hash_options_t opts = {
+      .strategy = PROBE_DOUBLE_HASH,
+      .size = 2,
+      .hasher = NULL,
+      .double_hasher = NULL,
+  };
+  hash_table_init_ex(&sut, opts);
+
+  char *keys[] = {
+      "hello",
+      "helo",
+  };
+
+  populate(keys, LEN(keys));
+  assert_values(keys, LEN(keys), true);
+}
+
 
 void test_deletions() {
   char *keys[] = {
@@ -80,5 +106,6 @@ int main() {
   RUN_TEST(test_insertions);
   RUN_TEST(test_collisions);
   RUN_TEST(test_deletions);
+  RUN_TEST(test_double_hash_collisions);
   return UNITY_END();
 }
