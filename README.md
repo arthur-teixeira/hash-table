@@ -26,4 +26,5 @@ $ ./run-tests.sh
 - [X] Add option to change the hashing function
 - [X] Add option to change the probing strategy (linear, quadratic and double hash)
 - [X] Rehash table depending on the load factor
-- [ ] Add possibility for the key to be any type, not just strings
+- [X] Add possibility for the key to be any type, not just strings
+- [ ] Add pair iteration
