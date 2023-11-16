@@ -26,6 +26,7 @@ typedef struct hash_options_t {
   hasher_t double_hasher;
   probe_strategy strategy;
   size_t size;
+  size_t used;
 } hash_options_t;
 
 typedef struct hash_table_t {
@@ -35,11 +36,12 @@ typedef struct hash_table_t {
   size_t size;
   size_t p;
   hash_position_t *values;
+  size_t used;
 } hash_table_t;
 
 void hash_table_delete(hash_table_t *table, const char *key);
 void *hash_table_lookup(hash_table_t *table, const char *key);
-void hash_table_insert(hash_table_t *table, char *key, void *value);
+void hash_table_insert(hash_table_t *table, const char *key, void *value);
 void hash_table_init(hash_table_t *table);
 void hash_table_init_ex(hash_table_t *table, hash_options_t options);
 
@@ -52,8 +54,16 @@ void hash_table_init_ex(hash_table_t *table, hash_options_t options);
 #define HASH_TABLE_MALLOC(nmemb) malloc(nmemb)
 #endif
 
+#ifndef HASH_TABLE_REALLOC
+#define HASH_TABLE_REALLOC(ptr, nmemb) realloc(ptr, nmemb)
+#endif
+
 #ifndef HASH_TABLE_FREE
 #define HASH_TABLE_FREE(ptr) free(ptr)
+#endif
+
+#ifndef HASH_TABLE_LOAD_FACTOR_THRESHOLD
+#define HASH_TABLE_LOAD_FACTOR_THRESHOLD 0.65f
 #endif
 
 int string_as_int(const char *key) {
@@ -151,10 +161,33 @@ size_t probe(hash_table_t *table, int hash, const char *key, size_t i) {
   }
 }
 
-void hash_table_insert(hash_table_t *table, char *key, void *value) {
-  int hash = table->hasher(table, key);
-  bool found = false;
+double load_factor(hash_table_t *t) {
+  return (double)t->used / (double)t->size;
+}
 
+void rehash(hash_table_t *t) {
+  hash_position_t *old_values = t->values;
+  size_t old_size = t->size;
+  t->size *= 2;
+  t->used = 0;
+
+  t->values = HASH_TABLE_MALLOC(t->size * sizeof(hash_position_t));
+
+  for (size_t i = 0; i < old_size; i++) {
+    if (old_values[i].in_use) {
+      hash_table_insert(t, old_values[i].key, old_values[i].value);
+    }
+  }
+
+  HASH_TABLE_FREE(old_values);
+}
+
+void hash_table_insert(hash_table_t *table, const char *key, void *value) {
+  if (load_factor(table) > HASH_TABLE_LOAD_FACTOR_THRESHOLD) {
+    rehash(table);
+  }
+
+  int hash = table->hasher(table, key);
   for (size_t i = 0; i < table->size; i++) {
     size_t idx = probe(table, hash, key, i);
     hash_position_t *position = &table->values[idx];
@@ -162,13 +195,9 @@ void hash_table_insert(hash_table_t *table, char *key, void *value) {
       position->in_use = true;
       position->key = key;
       position->value = value;
-      found = true;
+      table->used++;
       break;
     }
-  }
-
-  if (!found) {
-    assert(0 && "TODO: rehash table");
   }
 }
 
@@ -210,6 +239,7 @@ void hash_table_delete(hash_table_t *table, const char *key) {
   HASH_TABLE_FREE(node->value);
   node->value = NULL;
   node->key = 0;
+  table->used--;
 }
 
 #endif // HASH_TABLE_IMPLEMENTATION

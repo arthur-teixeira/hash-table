@@ -69,6 +69,7 @@ void test_double_hash_collisions() {
       .hasher = NULL,
       .double_hasher = NULL,
   };
+
   hash_table_init_ex(&sut, opts);
 
   char *keys[] = {
@@ -79,7 +80,6 @@ void test_double_hash_collisions() {
   populate(keys, LEN(keys));
   assert_values(keys, LEN(keys), true);
 }
-
 
 void test_deletions() {
   char *keys[] = {
@@ -101,11 +101,33 @@ void test_deletions() {
   }
 }
 
+void test_rehash() {
+  tearDown();
+  hash_options_t opts = {
+      .strategy = PROBE_LINEAR,
+      .size = 2,
+      .hasher = NULL,
+      .double_hasher = NULL,
+  };
+
+  hash_table_init_ex(&sut, opts);
+
+  char *keys[] = {
+      "hello", "hey", "hi", "bye", "byebye",
+  };
+
+  populate(keys, LEN(keys));
+  assert_values(keys, LEN(keys), true);
+  TEST_ASSERT_EQUAL(8, sut.size);
+  TEST_ASSERT_EQUAL(5, sut.used);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_insertions);
   RUN_TEST(test_collisions);
   RUN_TEST(test_deletions);
   RUN_TEST(test_double_hash_collisions);
+  RUN_TEST(test_rehash);
   return UNITY_END();
 }
