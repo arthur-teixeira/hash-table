@@ -55,7 +55,6 @@ bool memcmp_comparer(const void *a, size_t a_len, const void *b, size_t b_len);
 
 #endif // HASH_TABLE_H
 
-#define HASH_TABLE_IMPLEMENTATION // REMOVE
 #ifdef HASH_TABLE_IMPLEMENTATION
 
 #ifndef HASH_TABLE_MALLOC
